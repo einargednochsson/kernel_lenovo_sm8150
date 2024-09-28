@@ -285,16 +285,6 @@ int inet6_bind(struct socket *sock, struct sockaddr *uaddr, int addr_len)
 {
 	struct sock *sk = sock->sk;
 	const struct proto *prot;
-<<<<<<< HEAD
-	struct inet_sock *inet = inet_sk(sk);
-	struct ipv6_pinfo *np = inet6_sk(sk);
-	struct net *net = sock_net(sk);
-	__be32 v4addr = 0;
-	unsigned short snum;
-	bool saved_ipv6only;
-	int addr_type = 0;
-=======
->>>>>>> a7ec400c203a (BACKPORT: net: Introduce __inet_bind() and __inet6_bind)
 	int err = 0;
 
 	/* IPV6_ADDRFORM can change sk->sk_prot under us. */
@@ -446,20 +436,13 @@ int __inet6_bind(struct sock *sk, struct sockaddr *uaddr, int addr_len,
 		sk->sk_ipv6only = 1;
 
 	/* Make sure we are allowed to bind here. */
-	if (snum || !(inet->bind_address_no_port ||
-		      force_bind_address_no_port)) {
-		if (sk->sk_prot->get_port(sk, snum)) {
-			sk->sk_ipv6only = saved_ipv6only;
-			inet_reset_saddr(sk);
-			err = -EADDRINUSE;
-			goto out;
-		}
-		err = BPF_CGROUP_RUN_PROG_INET6_POST_BIND(sk);
-		if (err) {
-			sk->sk_ipv6only = saved_ipv6only;
-			inet_reset_saddr(sk);
-			goto out;
-		}
+	if ((snum || !(inet->bind_address_no_port ||
+		       force_bind_address_no_port)) &&
+	    sk->sk_prot->get_port(sk, snum)) {
+		sk->sk_ipv6only = saved_ipv6only;
+		inet_reset_saddr(sk);
+		err = -EADDRINUSE;
+		goto out;
 	}
 
 	if (addr_type != IPV6_ADDR_ANY)
@@ -933,10 +916,6 @@ static const struct ipv6_stub ipv6_stub_impl = {
 	.nd_tbl	= &nd_tbl,
 };
 
-static const struct ipv6_bpf_stub ipv6_bpf_stub_impl = {
-	.inet6_bind = __inet6_bind,
-};
-
 static int __init inet6_init(void)
 {
 	struct list_head *r;
@@ -1093,7 +1072,6 @@ static int __init inet6_init(void)
 	/* ensure that ipv6 stubs are visible only after ipv6 is ready */
 	wmb();
 	ipv6_stub = &ipv6_stub_impl;
-	ipv6_bpf_stub = &ipv6_bpf_stub_impl;
 out:
 	return err;
 
